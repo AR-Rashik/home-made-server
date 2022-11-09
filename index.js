@@ -22,6 +22,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     const serviceCollection = client.db("homeMade").collection("services");
+    const reviewCollection = client.db("homeMade").collection("reviews");
 
     // get services limit 3 data for home page.
     app.get("/services", async (req, res) => {
@@ -45,6 +46,13 @@ async function run() {
       const query = { _id: ObjectId(id) };
       const service = await serviceCollection.findOne(query);
       res.send(service);
+    });
+
+    // post the reviews
+    app.post("/reviews", async (req, res) => {
+      const review = req.body;
+      const result = await reviewCollection.insertOne(review);
+      res.send(result);
     });
   } finally {
   }

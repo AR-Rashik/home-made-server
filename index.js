@@ -1,5 +1,7 @@
 const express = require("express");
 const cors = require("cors");
+var jwt = require("jsonwebtoken");
+
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 
@@ -19,15 +21,41 @@ const client = new MongoClient(uri, {
   serverApi: ServerApiVersion.v1,
 });
 
+function verifyJWT(req, res, next) {
+  // console.log(req.headers.authorization);
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    res.status(401).send({ message: "unauthorized access" });
+  }
+  const token = authHeader.split(" ")[1];
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (error, decoded) {
+    if (error) {
+      return res.status(401).send({ message: "unauthorized access" });
+    }
+    req.decoded = decoded;
+    next();
+  });
+}
+
 async function run() {
   try {
     const serviceCollection = client.db("homeMade").collection("services");
     const reviewCollection = client.db("homeMade").collection("reviews");
 
+    //jwt token
+    app.post("/jwt", (req, res) => {
+      const user = req.body;
+      // console.log(user);
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1h",
+      });
+      res.send({ token });
+    });
+
     // get services limit 3 data for home page.
     app.get("/services", async (req, res) => {
       const query = {};
-      const cursor = serviceCollection.find(query);
+      const cursor = serviceCollection.find(query).sort([["_id", -1]]);
       const services = await cursor.limit(3).toArray();
       res.send(services);
     });
@@ -35,7 +63,7 @@ async function run() {
     // get all services data for services route.
     app.get("/allservices", async (req, res) => {
       const query = {};
-      const cursor = serviceCollection.find(query);
+      const cursor = serviceCollection.find(query).sort([["_id", -1]]);
       const services = await cursor.toArray();
       res.send(services);
     });
@@ -56,7 +84,9 @@ async function run() {
     });
 
     // get the reviews by email
-    app.get("/myreviews", async (req, res) => {
+    app.get("/myreviews", verifyJWT, async (req, res) => {
+      // console.log(req.headers.authorization);
+
       let query = {};
 
       if (req.query.email) {
@@ -106,7 +136,7 @@ async function run() {
         };
       }
       //.sort([["_id", -1]]);
-      const cursor = reviewCollection.find(query);
+      const cursor = reviewCollection.find(query).sort([["_id", -1]]);
       const reviews = await cursor.toArray();
       res.send(reviews);
     });
